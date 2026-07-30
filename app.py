@@ -128,23 +128,22 @@ if not df_filtrado.empty and 'peça' in df_filtrado.columns:
             Valor_Total=('valor', 'sum')
         )
         .reset_index()
-        .sort_values(by='Quantidade_Total', ascending=False)
     )
 
     # Organização em Abas para melhor visualização
-    aba_grafico, aba_ranking, aba_registros = st.tabs(["📊 Gráfico Top 10", "📋 Ranking Completo de Peças", "📑 Todos os Registros Filtrados"])
+    aba_grafico, aba_ranking, aba_registros = st.tabs(["📊 Gráfico Top 10 (por Qtd)", "📋 Ranking Completo (por Valor R$)", "📑 Todos os Registros Filtrados"])
 
     with aba_grafico:
-        top_10 = resumo_pecas.head(10).sort_values(by='Quantidade_Total', ascending=True)
+        # Gráfico ordenado por quantidade
+        top_10 = resumo_pecas.sort_values(by='Quantidade_Total', ascending=False).head(10).sort_values(by='Quantidade_Total', ascending=True)
         
-        # Gráfico de barras horizontais limpo e elegante
         fig = px.bar(
             top_10, 
             x='Quantidade_Total', 
             y='peça', 
             orientation='h',
             text='Quantidade_Total',
-            title="Top 10 Peças Mais Retiradas/Vendidas",
+            title="Top 10 Peças Mais Retiradas (por Quantidade)",
             labels={'Quantidade_Total': 'Quantidade Retirada', 'peça': 'Peça / Item'}
         )
         fig.update_traces(textposition='outside', marker_color='#1f77b4')
@@ -152,12 +151,16 @@ if not df_filtrado.empty and 'peça' in df_filtrado.columns:
         st.plotly_chart(fig, use_container_width=True)
 
     with aba_ranking:
-        resumo_exibicao = resumo_pecas.copy()
-        resumo_exibicao['Valor_Total'] = resumo_exibicao['Valor_Total'].apply(
+        # Tabela ordenada pelo MAIOR Valor Total em R$ (ordem decrescente)
+        resumo_ranking_valor = resumo_pecas.sort_values(by='Valor_Total', ascending=False).copy()
+        
+        # Formatação de moeda
+        resumo_ranking_valor['Valor_Total'] = resumo_ranking_valor['Valor_Total'].apply(
             lambda v: f"R$ {v:,.2f}".replace(',', 'v').replace('.', ',').replace('v', '.')
         )
-        resumo_exibicao.columns = ['Peça / Item', 'Quantidade Vendida/Retirada', 'Valor Total acumulado (R$)']
-        st.dataframe(resumo_exibicao, use_container_width=True, hide_index=True)
+        resumo_ranking_valor.columns = ['Peça / Item', 'Quantidade Vendida/Retirada', 'Valor Total Acumulado (R$)']
+        
+        st.dataframe(resumo_ranking_valor, use_container_width=True, hide_index=True)
 
     with aba_registros:
         st.dataframe(df_filtrado, use_container_width=True)
