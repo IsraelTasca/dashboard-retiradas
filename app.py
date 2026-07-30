@@ -22,7 +22,7 @@ def carregar_dados():
     # Tratamento da coluna Quantidade
     df['quantidade'] = pd.to_numeric(df['quantidade'], errors='coerce').fillna(0)
     
-    # Limpeza e conversão das colunas de texto para evitar erros no sorted()
+    # Limpeza e conversão das colunas de texto
     colunas_texto = ['placa', 'funcionario', 'pagamento', 'cliente', 'peça']
     for col in colunas_texto:
         if col in df.columns:
@@ -71,14 +71,14 @@ if termo_busca:
 st.sidebar.markdown("---")
 st.sidebar.subheader("Filtre por Coluna Específica")
 
-# Helper para gerar listas limpas sem valores nulos/vazios
+# Helper para gerar listas limpas
 def obter_opcoes(df_temp, coluna, opcao_padrao):
     if coluna in df_temp.columns:
         valores = [str(val) for val in df_temp[coluna].unique() if pd.notnull(val) and str(val).strip() not in ['', 'nan', 'None']]
         return [opcao_padrao] + sorted(list(set(valores)))
     return [opcao_padrao]
 
-# 3. Filtros Selecionáveis Seguros
+# 3. Filtros Selecionáveis
 placa_sel = st.sidebar.selectbox("Placa", obter_opcoes(df_filtrado, 'placa', "Todas"))
 func_sel = st.sidebar.selectbox("Funcionário", obter_opcoes(df_filtrado, 'funcionario', "Todos"))
 pag_sel = st.sidebar.selectbox("Forma de Pagamento", obter_opcoes(df_filtrado, 'pagamento', "Todos"))
@@ -97,7 +97,7 @@ if pag_sel != "Todos":
 if cli_sel != "Todos":
     df_filtrado = df_filtrado[df_filtrado['cliente'] == cli_sel]
 
-# --- PAINEL DE MÉTRICAS E RESULTADOS ---
+# --- PAINEL DE MÉTRICAS PRINCIPAIS ---
 col1, col2, col3 = st.columns(3)
 
 total_registros = len(df_filtrado)
@@ -105,16 +105,54 @@ qtd_pecas = df_filtrado['quantidade'].sum()
 valor_total = df_filtrado['valor'].sum()
 
 with col1:
-    st.metric(label="📋 Linhas/Ocorrências Encontradas", value=total_registros)
+    st.metric(label="📋 Linhas/Ocorrências", value=total_registros)
 
 with col2:
-    st.metric(label="🔢 Total de Peças/Quantidade", value=int(qtd_pecas))
+    st.metric(label="🔢 Total de Peças", value=int(qtd_pecas))
 
 with col3:
     st.metric(label="💰 Valor Total do Filtro", value=f"R$ {valor_total:,.2f}".replace(',', 'v').replace('.', ',').replace('v', '.'))
 
 st.markdown("---")
 
-# --- TABELA INTERATIVA DE REGISTROS ---
-st.subheader("📋 Tabela de Registros Filtrados")
+# --- NOVO: ANÁLISE DOS ITENS MAIS VENDIDOS / RETIRADOS ---
+st.subheader("🏆 Itens Mais Vendidos / Retirados no Período")
+
+if not df_filtrado.empty and 'peça' in df_filtrado.columns:
+    # Agrupa por peça e calcula a quantidade e valor total
+    resumo_pecas = (
+        df_filtrado.groupby('peça')
+        .agg(
+            Quantidade_Total=('quantidade', 'sum'),
+            Valor_Total=('valor', 'sum')
+        )
+        .reset_index()
+        .sort_values(by='Quantidade_Total', ascending=False)
+    )
+    
+    col_grafico, col_tabela = st.columns([1.2, 1])
+
+    with col_grafico:
+        st.write("📊 **Top 10 Itens por Quantidade**")
+        top_10 = resumo_pecas.head(10).set_index('peça')['Quantidade_Total']
+        st.bar_chart(top_10)
+
+    with col_tabela:
+        st.write("📋 **Ranking Completo de Peças no Período**")
+        
+        # Formata o valor total como moeda R$ para exibição
+        resumo_exibicao = resumo_pecas.copy()
+        resumo_exibicao['Valor_Total'] = resumo_exibicao['Valor_Total'].apply(
+            lambda v: f"R$ {v:,.2f}".replace(',', 'v').replace('.', ',').replace('v', '.')
+        )
+        resumo_exibicao.columns = ['Peça / Item', 'Qtd. Vendida', 'Valor Total (R$)']
+        
+        st.dataframe(resumo_exibicao, use_container_width=True, hide_index=True)
+else:
+    st.info("Nenhum dado encontrado para gerar a análise de itens com os filtros selecionados.")
+
+st.markdown("---")
+
+# --- TABELA INTERATIVA COMPLETA ---
+st.subheader("📋 Tabela de Registros Detalhados")
 st.dataframe(df_filtrado, use_container_width=True)
