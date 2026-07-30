@@ -6,13 +6,13 @@ st.set_page_config(page_title="Dashboard Geral de Registros", layout="wide")
 
 st.title("📊 Dashboard Completo de Registros e Valores")
 
-@st.cache_data
+@st.cache_data(ttl=60) # Limpa o cache a cada 60 segundos para pegar novos envios
 def carregar_dados():
     # Lê a planilha que está na raiz do repositório no GitHub
     df = pd.read_excel('planilha_reorganizada.xlsx')
     
-    # Tratamento da coluna Data
-    df['data'] = pd.to_datetime(df['data'], errors='coerce')
+    # Tratamento reforçado da coluna Data (força o formato dia/mês/ano)
+    df['data'] = pd.to_datetime(df['data'], dayfirst=True, errors='coerce')
     
     # Tratamento da coluna Valor
     if df['valor'].dtype == 'object':
@@ -36,11 +36,18 @@ df = carregar_dados()
 # --- BARRA LATERAL: FILTROS DINÂMICOS ---
 st.sidebar.header("🔍 Filtros de Seleção")
 
-# 1. Filtro por Período de Data
-data_min = df['data'].min().date() if not df['data'].isnull().all() else None
-data_max = df['data'].max().date() if not df['data'].isnull().all() else None
+# Botão manual para recarregar dados novos se necessário
+if st.sidebar.button("🔄 Atualizar Dados"):
+    st.cache_data.clear()
+    st.rerun()
 
-if data_min and data_max:
+# 1. Filtro por Período de Data
+datas_validas = df['data'].dropna()
+
+if not datas_validas.empty:
+    data_min = datas_validas.min().date()
+    data_max = datas_validas.max().date()
+    
     data_inicio, data_fim = st.sidebar.date_input(
         "📅 Período",
         value=(data_min, data_max),
@@ -130,11 +137,10 @@ if not df_filtrado.empty and 'peça' in df_filtrado.columns:
         .reset_index()
     )
 
-    # Organização em Abas para melhor visualização
+    # Organização em Abas
     aba_grafico, aba_ranking, aba_registros = st.tabs(["📊 Gráfico Top 10 (por Qtd)", "📋 Ranking Completo (por Valor R$)", "📑 Todos os Registros Filtrados"])
 
     with aba_grafico:
-        # Gráfico ordenado por quantidade
         top_10 = resumo_pecas.sort_values(by='Quantidade_Total', ascending=False).head(10).sort_values(by='Quantidade_Total', ascending=True)
         
         fig = px.bar(
@@ -151,10 +157,8 @@ if not df_filtrado.empty and 'peça' in df_filtrado.columns:
         st.plotly_chart(fig, use_container_width=True)
 
     with aba_ranking:
-        # Tabela ordenada pelo MAIOR Valor Total em R$ (ordem decrescente)
         resumo_ranking_valor = resumo_pecas.sort_values(by='Valor_Total', ascending=False).copy()
         
-        # Formatação de moeda
         resumo_ranking_valor['Valor_Total'] = resumo_ranking_valor['Valor_Total'].apply(
             lambda v: f"R$ {v:,.2f}".replace(',', 'v').replace('.', ',').replace('v', '.')
         )
