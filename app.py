@@ -1,5 +1,6 @@
 import streamlit as st
 import pandas as pd
+import plotly.express as px
 
 st.set_page_config(page_title="Dashboard Geral de Registros", layout="wide")
 
@@ -115,8 +116,8 @@ with col3:
 
 st.markdown("---")
 
-# --- NOVO: ANÁLISE DOS ITENS MAIS VENDIDOS / RETIRADOS ---
-st.subheader("🏆 Itens Mais Vendidos / Retirados no Período")
+# --- ANÁLISE DOS ITENS MAIS VENDIDOS / RETIRADOS ---
+st.subheader("🏆 Análise de Peças e Itens no Período")
 
 if not df_filtrado.empty and 'peça' in df_filtrado.columns:
     # Agrupa por peça e calcula a quantidade e valor total
@@ -129,30 +130,37 @@ if not df_filtrado.empty and 'peça' in df_filtrado.columns:
         .reset_index()
         .sort_values(by='Quantidade_Total', ascending=False)
     )
-    
-    col_grafico, col_tabela = st.columns([1.2, 1])
 
-    with col_grafico:
-        st.write("📊 **Top 10 Itens por Quantidade**")
-        top_10 = resumo_pecas.head(10).set_index('peça')['Quantidade_Total']
-        st.bar_chart(top_10)
+    # Organização em Abas para melhor visualização
+    aba_grafico, aba_ranking, aba_registros = st.tabs(["📊 Gráfico Top 10", "📋 Ranking Completo de Peças", "📑 Todos os Registros Filtrados"])
 
-    with col_tabela:
-        st.write("📋 **Ranking Completo de Peças no Período**")
+    with aba_grafico:
+        top_10 = resumo_pecas.head(10).sort_values(by='Quantidade_Total', ascending=True)
         
-        # Formata o valor total como moeda R$ para exibição
+        # Gráfico de barras horizontais limpo e elegante
+        fig = px.bar(
+            top_10, 
+            x='Quantidade_Total', 
+            y='peça', 
+            orientation='h',
+            text='Quantidade_Total',
+            title="Top 10 Peças Mais Retiradas/Vendidas",
+            labels={'Quantidade_Total': 'Quantidade Retirada', 'peça': 'Peça / Item'}
+        )
+        fig.update_traces(textposition='outside', marker_color='#1f77b4')
+        fig.update_layout(height=450, margin=dict(l=20, r=20, t=40, b=20))
+        st.plotly_chart(fig, use_container_width=True)
+
+    with aba_ranking:
         resumo_exibicao = resumo_pecas.copy()
         resumo_exibicao['Valor_Total'] = resumo_exibicao['Valor_Total'].apply(
             lambda v: f"R$ {v:,.2f}".replace(',', 'v').replace('.', ',').replace('v', '.')
         )
-        resumo_exibicao.columns = ['Peça / Item', 'Qtd. Vendida', 'Valor Total (R$)']
-        
+        resumo_exibicao.columns = ['Peça / Item', 'Quantidade Vendida/Retirada', 'Valor Total acumulado (R$)']
         st.dataframe(resumo_exibicao, use_container_width=True, hide_index=True)
+
+    with aba_registros:
+        st.dataframe(df_filtrado, use_container_width=True)
+
 else:
     st.info("Nenhum dado encontrado para gerar a análise de itens com os filtros selecionados.")
-
-st.markdown("---")
-
-# --- TABELA INTERATIVA COMPLETA ---
-st.subheader("📋 Tabela de Registros Detalhados")
-st.dataframe(df_filtrado, use_container_width=True)
