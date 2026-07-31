@@ -48,10 +48,27 @@ df = carregar_dados()
 # --- BARRA LATERAL: FILTROS DINÂMICOS ---
 st.sidebar.header("🔍 Filtros de Seleção")
 
-# Botão manual para recarregar dados novos
-if st.sidebar.button("🔄 Atualizar Dados"):
-    st.cache_data.clear()
-    st.rerun()
+# Função para resetar os valores dos filtros
+def resetar_filtros():
+    st.session_state['filtro_dia_semana'] = "Todos"
+    st.session_state['filtro_placa'] = "Todas"
+    st.session_state['filtro_funcionario'] = "Todos"
+    st.session_state['filtro_pagamento'] = "Todos"
+    st.session_state['filtro_cliente'] = "Todos"
+    if 'filtro_periodo' in st.session_state:
+        del st.session_state['filtro_periodo']
+
+# Botões de Ação na Lateral (Atualizar e Resetar)
+col_btn1, col_btn2 = st.sidebar.columns(2)
+with col_btn1:
+    if st.button("🔄 Atualizar"):
+        st.cache_data.clear()
+        st.rerun()
+
+with col_btn2:
+    st.button("🧹 Limpar", on_click=resetar_filtros)
+
+st.sidebar.markdown("---")
 
 # 1. Filtro por Período de Data
 datas_validas = df['data'].dropna()
@@ -64,7 +81,8 @@ if not datas_validas.empty:
         "📅 Período",
         value=(data_min, data_max),
         min_value=data_min,
-        max_value=data_max
+        max_value=data_max,
+        key='filtro_periodo'
     )
 else:
     data_inicio, data_fim = None, None
@@ -77,11 +95,9 @@ if data_inicio and data_fim:
         (df_filtrado['data'].dt.date <= data_fim)
     ]
 
-st.sidebar.markdown("---")
-
 # 2. Filtro por Dia da Semana
 opcoes_dias = ["Todos", "Segunda-feira", "Terça-feira", "Quarta-feira", "Quinta-feira", "Sexta-feira", "Sábado", "Domingo"]
-dia_semana_sel = st.sidebar.selectbox("📅 Dia da Semana", opcoes_dias)
+dia_semana_sel = st.sidebar.selectbox("📅 Dia da Semana", opcoes_dias, key='filtro_dia_semana')
 
 if dia_semana_sel != "Todos":
     df_filtrado = df_filtrado[df_filtrado['dia_semana'] == dia_semana_sel]
@@ -97,10 +113,10 @@ def obter_opcoes(df_temp, coluna, opcao_padrao):
     return [opcao_padrao]
 
 # 3. Filtros Selecionáveis
-placa_sel = st.sidebar.selectbox("Placa", obter_opcoes(df_filtrado, 'placa', "Todas"))
-func_sel = st.sidebar.selectbox("Funcionário", obter_opcoes(df_filtrado, 'funcionario', "Todos"))
-pag_sel = st.sidebar.selectbox("Forma de Pagamento", obter_opcoes(df_filtrado, 'pagamento', "Todos"))
-cli_sel = st.sidebar.selectbox("Cliente", obter_opcoes(df_filtrado, 'cliente', "Todos"))
+placa_sel = st.sidebar.selectbox("Placa", obter_opcoes(df, 'placa', "Todas"), key='filtro_placa')
+func_sel = st.sidebar.selectbox("Funcionário", obter_opcoes(df, 'funcionario', "Todos"), key='filtro_funcionario')
+pag_sel = st.sidebar.selectbox("Forma de Pagamento", obter_opcoes(df, 'pagamento', "Todos"), key='filtro_pagamento')
+cli_sel = st.sidebar.selectbox("Cliente", obter_opcoes(df, 'cliente', "Todos"), key='filtro_cliente')
 
 # Aplicação dos Filtros
 if placa_sel != "Todas":
