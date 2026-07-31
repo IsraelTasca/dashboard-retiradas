@@ -6,13 +6,25 @@ st.set_page_config(page_title="Dashboard Geral de Registros", layout="wide")
 
 st.title("📊 Dashboard Completo de Registros e Valores")
 
-@st.cache_data(ttl=60) # Limpa o cache a cada 60 segundos para pegar novos envios
+@st.cache_data(ttl=60)
 def carregar_dados():
     # Lê a planilha que está na raiz do repositório no GitHub
     df = pd.read_excel('planilha_reorganizada.xlsx')
     
-    # Tratamento reforçado da coluna Data (força o formato dia/mês/ano)
+    # Tratamento da coluna Data (força o formato dia/mês/ano)
     df['data'] = pd.to_datetime(df['data'], dayfirst=True, errors='coerce')
+    
+    # Mapeamento para nomes dos dias da semana em português
+    dias_pt = {
+        0: 'Segunda-feira',
+        1: 'Terça-feira',
+        2: 'Quarta-feira',
+        3: 'Quinta-feira',
+        4: 'Sexta-feira',
+        5: 'Sábado',
+        6: 'Domingo'
+    }
+    df['dia_semana'] = df['data'].dt.dayofweek.map(dias_pt)
     
     # Tratamento da coluna Valor
     if df['valor'].dtype == 'object':
@@ -36,7 +48,7 @@ df = carregar_dados()
 # --- BARRA LATERAL: FILTROS DINÂMICOS ---
 st.sidebar.header("🔍 Filtros de Seleção")
 
-# Botão manual para recarregar dados novos se necessário
+# Botão manual para recarregar dados novos
 if st.sidebar.button("🔄 Atualizar Dados"):
     st.cache_data.clear()
     st.rerun()
@@ -67,7 +79,16 @@ if data_inicio and data_fim:
 
 st.sidebar.markdown("---")
 
-# 2. Busca Rápida de Texto
+# 2. Filtro por Dia da Semana (NOVO!)
+opcoes_dias = ["Todos", "Segunda-feira", "Terça-feira", "Quarta-feira", "Quinta-feira", "Sexta-feira", "Sábado", "Domingo"]
+dia_semana_sel = st.sidebar.selectbox("📅 Dia da Semana", opcoes_dias)
+
+if dia_semana_sel != "Todos":
+    df_filtrado = df_filtrado[df_filtrado['dia_semana'] == dia_semana_sel]
+
+st.sidebar.markdown("---")
+
+# 3. Busca Rápida de Texto
 termo_busca = st.sidebar.text_input("🔎 Pesquisa Geral (qualquer termo):", "")
 
 if termo_busca:
@@ -86,7 +107,7 @@ def obter_opcoes(df_temp, coluna, opcao_padrao):
         return [opcao_padrao] + sorted(list(set(valores)))
     return [opcao_padrao]
 
-# 3. Filtros Selecionáveis
+# 4. Filtros Selecionáveis
 placa_sel = st.sidebar.selectbox("Placa", obter_opcoes(df_filtrado, 'placa', "Todas"))
 func_sel = st.sidebar.selectbox("Funcionário", obter_opcoes(df_filtrado, 'funcionario', "Todos"))
 pag_sel = st.sidebar.selectbox("Forma de Pagamento", obter_opcoes(df_filtrado, 'pagamento', "Todos"))
@@ -123,10 +144,10 @@ with col3:
 
 st.markdown("---")
 
-# --- ANÁLISE DOS ITENS MAIS VENDIDOS / RETIRADOS ---
-st.subheader("🏆 Análise de Peças e Itens no Período")
+# --- ANÁLISE DOS ITENS E DIAS DA SEMANA ---
+st.subheader("🏆 Análise Geral e Desempenho")
 
-if not df_filtrado.empty and 'peça' in df_filtrado.columns:
+if not df_filtrado.empty:
     # Agrupa por peça e calcula a quantidade e valor total
     resumo_pecas = (
         df_filtrado.groupby('peça')
@@ -138,7 +159,12 @@ if not df_filtrado.empty and 'peça' in df_filtrado.columns:
     )
 
     # Organização em Abas
-    aba_grafico, aba_ranking, aba_registros = st.tabs(["📊 Gráfico Top 10 (por Qtd)", "📋 Ranking Completo (por Valor R$)", "📑 Todos os Registros Filtrados"])
+    aba_grafico, aba_ranking, aba_dias, aba_registros = st.tabs([
+        "📊 Gráfico Top 10 (por Qtd)", 
+        "📋 Ranking Completo (por Valor R$)", 
+        "📅 Vendas por Dia da Semana", 
+        "📑 Todos os Registros Filtrados"
+    ])
 
     with aba_grafico:
         top_10 = resumo_pecas.sort_values(by='Quantidade_Total', ascending=False).head(10).sort_values(by='Quantidade_Total', ascending=True)
@@ -166,8 +192,38 @@ if not df_filtrado.empty and 'peça' in df_filtrado.columns:
         
         st.dataframe(resumo_ranking_valor, use_container_width=True, hide_index=True)
 
+    with aba_dias:
+        st.write("📊 **Resumo de Vendas por Dia da Semana**")
+        
+        # Agrupamento dos dias da semana
+        ordem_dias = ["Segunda-feira", "Terça-feira", "Quarta-feira", "Quinta-feira", "Sexta-feira", "Sábado", "Domingo"]
+        resumo_dias = (
+            df_filtrado.groupby('dia_semana')
+            .agg(
+                Qtd_Ocorrencias=('valor', 'count'),
+                Qtd_Pecas=('quantidade', 'sum'),
+                Valor_Total=('valor', 'sum')
+            )
+            .reindex(ordem_dias)
+            .dropna(subset=['Qtd_Ocorrencias'])
+            .reset_index()
+        )
+        
+        fig_dias = px.bar(
+            resumo_dias,
+            x='dia_semana',
+            y='Valor_Total',
+            text='Valor_Total',
+            title="Faturamento Total por Dia da Semana (R$)",
+            labels={'dia_semana': 'Dia da Semana', 'Valor_Total': 'Valor Total (R$)'}
+        )
+        fig_dias.update_traces(texttemplate='R$ %{y:,.2f}', textposition='outside', marker_color='#2ca02c')
+        fig_dias.update_layout(height=400)
+        st.plotly_chart(fig_dias, use_container_width=True)
+
     with aba_registros:
+        # Exibe a tabela detalhada incluindo a coluna Dia da Semana
         st.dataframe(df_filtrado, use_container_width=True)
 
 else:
-    st.info("Nenhum dado encontrado para gerar a análise de itens com os filtros selecionados.")
+    st.info("Nenhum dado encontrado para gerar a análise com os filtros selecionados.")
