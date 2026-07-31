@@ -79,23 +79,12 @@ if data_inicio and data_fim:
 
 st.sidebar.markdown("---")
 
-# 2. Filtro por Dia da Semana (NOVO!)
+# 2. Filtro por Dia da Semana
 opcoes_dias = ["Todos", "Segunda-feira", "Terça-feira", "Quarta-feira", "Quinta-feira", "Sexta-feira", "Sábado", "Domingo"]
 dia_semana_sel = st.sidebar.selectbox("📅 Dia da Semana", opcoes_dias)
 
 if dia_semana_sel != "Todos":
     df_filtrado = df_filtrado[df_filtrado['dia_semana'] == dia_semana_sel]
-
-st.sidebar.markdown("---")
-
-# 3. Busca Rápida de Texto
-termo_busca = st.sidebar.text_input("🔎 Pesquisa Geral (qualquer termo):", "")
-
-if termo_busca:
-    mascara = df_filtrado.astype(str).apply(
-        lambda col: col.str.contains(termo_busca, case=False, na=False)
-    ).any(axis=1)
-    df_filtrado = df_filtrado[mascara]
 
 st.sidebar.markdown("---")
 st.sidebar.subheader("Filtre por Coluna Específica")
@@ -107,7 +96,7 @@ def obter_opcoes(df_temp, coluna, opcao_padrao):
         return [opcao_padrao] + sorted(list(set(valores)))
     return [opcao_padrao]
 
-# 4. Filtros Selecionáveis
+# 3. Filtros Selecionáveis
 placa_sel = st.sidebar.selectbox("Placa", obter_opcoes(df_filtrado, 'placa', "Todas"))
 func_sel = st.sidebar.selectbox("Funcionário", obter_opcoes(df_filtrado, 'funcionario', "Todos"))
 pag_sel = st.sidebar.selectbox("Forma de Pagamento", obter_opcoes(df_filtrado, 'pagamento', "Todos"))
@@ -222,7 +211,6 @@ if not df_filtrado.empty:
         st.plotly_chart(fig_dias, use_container_width=True)
 
     with aba_registros:
-        # Exibe a tabela detalhada incluindo a coluna Dia da Semana
         st.dataframe(df_filtrado, use_container_width=True)
 
 else:
